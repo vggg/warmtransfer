@@ -5,10 +5,73 @@ from twilio.rest import TwilioRestClient
 from flask import jsonify
 from flask import render_template
 from flask import url_for
+from flask import make_response
+from datetime import timedelta
+from functools import update_wrapper
+
+try:
+    # The typical way to import flask-cors
+    from flask.ext.cors import cross_origin
+except ImportError:
+    # Path hack allows examples to be run without installation.
+    import os
+    parentdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    os.sys.path.insert(0, parentdir)
+
+    from flask.ext.cors import cross_origin
+
+
+def crossdomain(origin=None, methods=None, headers=None,
+                max_age=21600, attach_to_all=True,
+                automatic_options=True):
+    if methods is not None:
+        methods = ', '.join(sorted(x.upper() for x in methods))
+    if headers is not None and not isinstance(headers, basestring):
+        headers = ', '.join(x.upper() for x in headers)
+    if not isinstance(origin, basestring):
+        origin = ', '.join(origin)
+    if isinstance(max_age, timedelta):
+        max_age = max_age.total_seconds()
+
+    def get_methods():
+        if methods is not None:
+            return methods
+
+        options_resp = app.make_default_options_response()
+        return options_resp.headers['allow']
+
+    def decorator(f):
+        def wrapped_function(*args, **kwargs):
+            if automatic_options and request.method == 'OPTIONS':
+                resp = app.make_default_options_response()
+            else:
+                resp = make_response(f(*args, **kwargs))
+            if not attach_to_all and request.method != 'OPTIONS':
+                return resp
+
+            h = resp.headers
+
+            h['Access-Control-Allow-Origin'] = origin
+            h['Access-Control-Allow-Methods'] = get_methods()
+            h['Access-Control-Max-Age'] = str(max_age)
+            if headers is not None:
+                h['Access-Control-Allow-Headers'] = headers
+            return resp
+
+        f.provide_automatic_options = False
+        return update_wrapper(wrapped_function, f)
+    return decorator
+
 
 #app = Flask(__name__)
 app = Flask(__name__, static_url_path='/static')
 client = TwilioRestClient()
+
+app.config['CORS_HEADERS'] = 'Content-Type'
+app.config['SECRET_KEY'] = 'hi'
+#cors = CORS(app, resources={r"/sendMessage": {"origins": "*"}})
+
+
 app.config.from_pyfile('local_settings.py')
 
 # this should be your Twilio number, format: +14155551234
@@ -59,6 +122,7 @@ def agent_johnson_test():
     return Response(str(response), 200, mimetype="application/xml")
 
 @app.route('/')
+@cross_origin(origin='localhost',headers=['Content- Type','Authorization'])
 def index():
     return render_template('index.html',
                            configuration_error=None)
@@ -66,9 +130,15 @@ def index():
 
 # Voice Request URL
 @app.route('/click2call', methods=['POST'])
+@cross_origin(allow_headers=['Content-Type'])
 def call():
     # Get phone number we need to call
-    phone_number = request.form.get('phoneNumber', None)
+    data = request.get_json()
+    phone_number = data['phoneNumber']
+    #print('phoneNumber', phone_number)
+    #message = request.form.get('message', None)
+    #message = data['message']
+
 
     try:
         twilio_client = TwilioRestClient(app.config['TWILIO_ACCOUNT_SID'],
@@ -90,11 +160,18 @@ def call():
 
 
 # Voice Request URL
-@app.route('/sendMessage', methods=['POST'])
+@app.route('/sendMessage', methods=['POST', 'OPTIONS'])
+@cross_origin(allow_headers=['Content-Type'])
+#@crossdomain(origin='*')
 def sendMessage():
     # Get phone number we need to call
-    phone_number = request.form.get('phoneNumber', None)
-    message = request.form.get('message', None)
+
+    #phone_number = request.form.get('phoneNumber', None)
+    data = request.get_json()
+    phone_number = data['phoneNumber']
+    print('phoneNumber', phone_number)
+    #message = request.form.get('message', None)
+    message = data['message']
 
     try:
         twilio_client = TwilioRestClient(app.config['TWILIO_ACCOUNT_SID'],
@@ -119,8 +196,11 @@ def sendMessage():
 def outbound():
     response = twiml.Response()
 
-    response.say("Thank you for contacting our service. We will connect you with a doctor right away...",
-                 voice='alice')
+    response.say("If this is a emergency, Please hang up and dial nine one one right away...",
+                 voice='woman')
+    response.pause()
+    response.say("Please Standby, Connecting with Dr. Pepper now",
+                 voice='man')
 
     # Uncomment this code and replace the number with the number you want
     # your customers to call.
