@@ -5,9 +5,9 @@ Configuration Settings
 ''' Uncomment to configure using the file.  
 WARNING: Be careful not to post your account credentials on GitHub.
 
-TWILIO_ACCOUNT_SID = "AC30fb989c30065e231a94d816bd6178d6" 
-TWILIO_AUTH_TOKEN = "a821d934bd1de0f906cb8d6fa6a2307f"
-TWILIO_CALLER_ID = "+15102963363"
+TWILIO_ACCOUNT_SID = "A_SID"
+TWILIO_AUTH_TOKEN = "A_TOKEN"
+TWILIO_CALLER_ID = "T_CID"
 '''
 
 import os
